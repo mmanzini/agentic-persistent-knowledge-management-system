@@ -1,0 +1,90 @@
+# Evaluation question set
+
+Fixed questions used by the `evaluate` verb to measure whether the
+wiki is getting better at answering things the user actually cares
+about. **This is the wiki's `val_bpb` analog** — without a
+representative question set, "did the wiki improve?" is unmeasurable
+and the autoresearch discipline collapses into a vibe.
+
+**Replace these placeholders with your real questions.** The seeded
+five target the placeholder buckets and span the access patterns the
+wiki must support: single-topic retrieval, within-bucket cross-topic
+retrieval, and cross-bucket distinction. Their value is illustrative
+— rewrite them once you know what you actually want this vault to
+answer.
+
+The verb spec for `evaluate` lives in [CLAUDE.md](../../CLAUDE.md);
+the row schema for results lives in [schema.md](../../schema.md).
+
+## Questions
+
+### q1 — single-topic retrieval (Domain A)
+
+**Prompt:** What is the argument for small teams shipping faster
+than large ones?
+
+**Target topic:** `domain-a/topic-one`. Tests that a query for a
+single-topic question reads only that topic's articles, not its
+neighbours.
+
+**Expected file_read budget:** 1 article body.
+
+### q2 — single-topic retrieval (different topic)
+
+**Prompt:** When is duplication preferable to abstraction, and why?
+
+**Target topic:** `domain-a/topic-two`. Tests routing within a
+bucket: the answer should come from `topic-two`, not `topic-one`.
+
+**Expected file_read budget:** 1 article body.
+
+### q3 — within-bucket cross-topic retrieval
+
+**Prompt:** Is team size the cause of coordination cost, or merely
+a proxy?
+
+**Target topics:** `domain-a/topic-one` ↔ `domain-a/topic-two`.
+Tests that the agent follows `[[wiki links]]` across topics inside
+a bucket when the answer requires synthesising both. The article in
+`topic-one` notes the contradiction with `topic-two`'s framing
+explicitly — a `good` answer should reference both.
+
+**Expected file_read budget:** 2 article bodies.
+
+### q4 — different-bucket detail recall
+
+**Prompt:** What blocks platform teams from automating credential
+rotation?
+
+**Target topic:** `domain-b/topic-three`. Tests that the agent
+correctly routes to the second bucket and doesn't mis-route to
+Domain A's operational-sounding articles.
+
+**Expected file_read budget:** 1 article body.
+
+### q5 — citation-based reasoning
+
+**Prompt:** Do the available sources address whether secret rotation
+is primarily a tooling problem or a political one? If so, on what
+basis?
+
+**Target topic:** `domain-b/topic-three`. Tests that the agent reads
+the citations carefully, surfaces the single-source caveat
+(`(source: needs-verification)` for the "how representative this is"
+claim), and doesn't overclaim. A `good` answer cites the
+political-blocker reasoning AND notes the evidence is one
+interview.
+
+**Expected file_read budget:** 1 article body.
+
+## How to add a question
+
+1. Append a new section here with an ID (`q6`, `q7`, …), a prompt,
+   target topic(s), and an expected file_read budget.
+2. Re-run `evaluate`. The new question will get a baseline row in
+   `results.tsv`.
+3. Compare future runs to that baseline.
+
+Don't remove a question without a reason — the trajectory of a
+specific question's read-cost over time is the signal autoresearch
+relies on.

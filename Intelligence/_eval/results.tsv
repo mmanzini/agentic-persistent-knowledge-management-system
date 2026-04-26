@@ -1,0 +1,2 @@
+timestamp	question_id	files_read	answer_quality	notes
+2026-04-26T12:00:04Z	q0	0	missing	seed example row; replace once first evaluate run completes
