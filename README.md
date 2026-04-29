@@ -14,9 +14,15 @@ vault/
 ├── schema.md               # frozen harness — read-only to the agent
 │
 ├── Resources/              # immutable input — raw sources (clippings, transcriptions, PDFs)
+│   ├── context/            # auto-capture drop folder (ephemeral signals, deleted after consolidate)
+│   ├── personal/           # prescriptive sources — about-me, writing-rules (kept after consolidate)
 │   └── <folder>/
 │       ├── README.md       # controls consolidation and post-run deletion
 │       └── *.md / *.pdf / ...
+│
+├── Skills/                 # agent skill definitions (read-only during vault verbs)
+│   └── auto-capture/
+│       └── SKILL.md        # auto-capture skill — writes signals to Resources/context/
 │
 └── Intelligence/           # agent-maintained wiki
     ├── index.md            # top-level bucket directory
@@ -254,11 +260,16 @@ The orchestrator compares the current drift count to the previous `refine_summar
 1. Clone this repo as your vault root.
 2. Replace the placeholder `domain-a` / `domain-b` buckets with your own macro taxonomy. Each bucket needs a `_master-index.md` with a Scope paragraph.
 3. Replace or extend `_eval/questions.md` with questions your vault should be able to answer. These are your benchmark — be specific.
-4. Drop source material into `Resources/<folder>/` with a `README.md` declaring the consolidation flags.
-5. Point Claude Code at the vault root and run `consolidate`.
-6. Ask questions with `query`. Run `refine` periodically to catch drift. Run `evaluate` to track retrieval quality over time.
+4. Fill in `Resources/personal/about-me.md` and `Resources/personal/writing-rules.md` with your own identity and style notes. These are prescriptive — the agent preserves your wording rather than paraphrasing.
+5. Drop source material into `Resources/<folder>/` with a `README.md` declaring the consolidation flags.
+6. Point Claude Code at the vault root and run `consolidate`.
+7. Ask questions with `query`. Run `refine` periodically to catch drift. Run `evaluate` to track retrieval quality over time.
 
 The `CLAUDE.md` and `schema.md` at the vault root are the agent's operating contract — keep them in place.
+
+### Auto-capture
+
+The `Skills/auto-capture/SKILL.md` skill lets the agent quietly persist conversational signals (decisions, preferences, opinions, facts) to `Resources/context/` during any conversation — no explicit "save this" needed. Those captures accumulate and are consolidated into `Intelligence/` on the next `consolidate` run, then deleted per the folder's `delete_after_consolidation: true` flag.
 
 ---
 

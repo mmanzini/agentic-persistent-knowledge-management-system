@@ -19,6 +19,8 @@ improve agent behaviour; never edit `schema.md` mid-run.
   - **Topics** (`Intelligence/<bucket>/<topic>/`) — **agent-curated**
     clusters created during `consolidate`. Topic creation is allowed
     and expected.
+- **`Skills/`** — agent skill definitions. Read-only for vault verbs
+  (`query`, `consolidate`, `refine`, `evaluate`).
 
 ## Session start
 
@@ -72,6 +74,18 @@ bodies last.
    continuing — usually the question is too broad or the buckets
    are mis-cut.
 
+**Personal context auto-pull.** `query`-style walks aren't only
+triggered by explicit user questions. When the task at hand is
+**generative and personal-context-relevant** — drafting prose,
+writing a post or an email, designing user-facing copy, deciding
+tone, or making a choice where the user's preferences matter — the
+agent walks `Intelligence/personal/` *before generating*, if that
+bucket exists. The trigger is the task type, not the user's wording.
+For purely technical or reference work (debugging, code reading,
+"how does library X behave"), skip the personal bucket entirely.
+The bucket's `_master-index.md` Scope paragraph is the routing
+signal — read it first if unsure.
+
 ---
 
 ### `consolidate`
@@ -123,6 +137,17 @@ list of touched paths to the orchestrator. The orchestrator is the
 sole writer of `Intelligence/index.md`, `Intelligence/log.tsv`,
 `Intelligence/_unsorted/`, and `Intelligence/_eval/results.tsv` —
 this is hard rule 8 in `schema.md`.
+
+**Prescriptive sources (`Resources/personal/`).** Sources in
+`Resources/personal/` (e.g. `about-me.md`, `writing-rules.md`) are
+prescriptive — identity statements and writing rules whose voice
+*is* the value. When deriving articles from them, **preserve the
+original wording**. Quote or near-verbatim copy with light
+structural framing rather than paraphrase. Cite the source normally
+with `(source: <filename>)`. Paraphrasing destroys the point.
+This applies only to `Resources/personal/`; sources in
+`Resources/context/` and elsewhere follow the normal summarise-and-
+cite flow.
 
 ---
 
