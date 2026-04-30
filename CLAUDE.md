@@ -27,7 +27,7 @@ improve agent behaviour; never edit `schema.md` mid-run.
 1. Read [schema.md](schema.md) once. Treat it as fixed for the
    session. Do not edit it.
 2. Read this file (the verbs and orchestration rules below).
-3. Read `Intelligence/index.md` only when entering the wiki for a
+3. Read `Intelligence/index.md` when entering the wiki for a
    `query` or `consolidate`.
 
 ## Verbs
@@ -94,6 +94,11 @@ When the user says "consolidate":
 
 1. Walk `Resources/` recursively. For each subfolder, read its
    `README.md` and skip if `include_in_consolidation: false`.
+
+   **Virgin-folder check.** Cross-reference the surviving folders
+   against `log.tsv`. Any folder with zero `status=kept` rows is
+   *never-consolidated* and must be processed this run — log absence
+   means "hasn't started", not "already done".
 2. For every remaining source file, pick the best-fit **bucket(s)**
    by comparing content against each
    `Intelligence/<bucket>/_master-index.md` Scope paragraph.
@@ -103,6 +108,8 @@ When the user says "consolidate":
      report. **Never silently invent a bucket.**
    - Two or more buckets fit → write the article into each, with
      images copied into each per `schema.md` *Image handling*.
+   - Article already in the target topic's `_index.md` → skip. (Log
+     absence is **not** a skip signal — see step 1.)
 3. Within the chosen bucket, pick the best-fit **topic** by
    comparing content against each `<topic>/_index.md` description.
    No topic fits → **create a new topic folder** with its
