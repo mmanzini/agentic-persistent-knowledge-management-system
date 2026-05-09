@@ -56,7 +56,7 @@ bodies last.
    **Do not load article bodies yet.**
 4. **Read articles.** Within the chosen topic(s), use the topic
    `_index.md` Articles list (each article has a one-line
-   description) to pick which article files to actually `Read`.
+   description) to pick which article files to actually read.
    Pull only those. The topic's `Related Topics` block tells you
    where to step sideways within the same bucket.
 5. **Stop at bucket boundaries.** Wiki links inside articles are
@@ -92,6 +92,14 @@ signal — read it first if unsure.
 
 When the user says "consolidate":
 
+0. **Quarantine pre-step.** List the contents of
+   `Intelligence/_unsorted/` (excluding `_index.md`). If anything is
+   there, surface it to the human and ask, per article: **create a
+   new bucket / route to an existing bucket / delete**. Apply the
+   chosen resolution and append a `log.tsv` row per resolved article
+   (`status=kept` with `notes=quarantine resolved: <action>`) before
+   processing any new sources. This prevents `_unsorted/` from
+   accumulating across runs.
 1. Walk `Resources/` recursively. For each subfolder, read its
    `README.md` and skip if `include_in_consolidation: false`.
 
@@ -124,7 +132,7 @@ When the user says "consolidate":
    (rare).
 8. Append one row per processed source to `Intelligence/log.tsv`
    in the format defined in `schema.md`. The orchestrator is the
-   sole writer of `log.tsv` (subagents emit row data; the
+   sole writer of `log.tsv` (per-bucket workers emit row data; the
    orchestrator appends).
 9. For each successfully consolidated source, honour
    `delete_after_consolidation`:
@@ -137,13 +145,18 @@ When the user says "consolidate":
     run `refine` (see below) and surface its drift-count delta vs
     the previous `refine_summary` row in the same run report.
 
-**Parallelism.** One subagent per bucket. Each subagent enters its
-bucket, scores candidate sources, and writes articles + topic
-indexes inside that bucket only. Subagents return row data and a
-list of touched paths to the orchestrator. The orchestrator is the
-sole writer of `Intelligence/index.md`, `Intelligence/log.tsv`,
+**Per-bucket workers.** One worker per bucket. Each worker enters its
+bucket, scores candidate sources, and writes articles + topic indexes
+inside that bucket only. Workers return row data and a list of
+touched paths to the orchestrator. The orchestrator is the sole
+writer of `Intelligence/index.md`, `Intelligence/log.tsv`,
 `Intelligence/_unsorted/`, and `Intelligence/_eval/results.tsv` —
 this is hard rule 8 in `schema.md`.
+
+If the runtime supports parallel subagents, run the per-bucket
+workers in parallel. Otherwise process buckets sequentially in one
+process. Either path obeys hard-rule 8; parallelism is an
+optimisation, not a correctness requirement.
 
 **Prescriptive sources (`Resources/personal/`).** Sources in
 `Resources/personal/` (e.g. `about-me.md`, `writing-rules.md`) are
@@ -187,6 +200,11 @@ Also report (do not count toward drift; track separately in `notes`):
   merge with no information loss, or articles redundant enough to
   prune. Propose, do not apply. Apply the autoresearch simplicity
   criterion: *equal information content + simpler structure = win*.
+- **Topic obesity** — any topic whose folder contains more than 25
+  article files. List as `split_candidate=<bucket>/<topic>:<count>`
+  in `notes`. The topic's `_index.md` becomes too long to serve its
+  routing purpose at that size; flag for human decision (split into
+  sibling topics or accept the cost).
 
 Append one summary row per run to `log.tsv` with
 `status=refine_summary`, `notes` including
@@ -237,13 +255,14 @@ to `_eval/results.tsv`, and produce a summary.
 
 ## Orchestration rules
 
-- **One orchestrator per run.** Spawns the per-bucket subagents,
+- **One orchestrator per run.** Runs the per-bucket workers (in
+  parallel if the runtime supports it, otherwise sequentially),
   collects their reports, and is the **sole writer** of
   `Intelligence/index.md`, `Intelligence/log.tsv`,
   `Intelligence/_unsorted/`, and `Intelligence/_eval/results.tsv`.
-- **Subagent scope.** A subagent assigned to bucket `X` writes
+- **Worker scope.** A worker assigned to bucket `X` writes
   **only** inside `Intelligence/X/`. Any attempt to write outside
-  is a hard-rule-8 violation and aborts the subagent.
+  is a hard-rule-8 violation and aborts the worker.
 - **Auto-chain.** `consolidate` → `refine` always. `evaluate` runs
   on user request and is recommended after any structurally
   significant `consolidate` (new bucket touched, >3 articles
@@ -252,6 +271,16 @@ to `_eval/results.tsv`, and produce a summary.
   `run=<verb> advance|hold|regress drift=<N> Δdrift=<±N>` (for
   `refine`/`consolidate`) or `total_files_read=<N> quality=<...>`
   (for `evaluate`).
+- **Advance/hold/regress is derived, not narrated.** The
+  orchestrator computes the label by reading the prior
+  `refine_summary` (or `eval_summary`) row directly from
+  `log.tsv` and parsing the `drift=<N>` (or `total_files_read=<N>`)
+  field. Do **not** rely on free-text `notes` for the delta — parse
+  the structured field. The `notes` field stays freeform context;
+  the label is arithmetic on the structured field. If the prior
+  row's structured field is missing or unparseable, treat as
+  `(no baseline)` and surface the gap in the report rather than
+  guessing.
 
 ## On contradictions vs `_unsorted/`
 

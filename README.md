@@ -80,7 +80,7 @@ Ingest sources from `Resources/` into `Intelligence/`:
 5. Update `_index.md`, `_master-index.md` (if new topic), `log.tsv`.
 6. Delete source if `delete_after_consolidation: true` (default).
 
-**Parallelism:** one subagent per bucket. Only the orchestrator writes `_unsorted/`, `index.md`, `log.tsv`, and `_eval/results.tsv`.
+**Per-bucket workers:** one worker per bucket — run in parallel if the runtime supports it, otherwise sequentially. Only the orchestrator writes `_unsorted/`, `index.md`, `log.tsv`, and `_eval/results.tsv`.
 
 ### `refine`
 
@@ -250,7 +250,7 @@ The orchestrator compares the current drift count to the previous `refine_summar
 5. **Images live beside their article.** No cross-folder image references.
 6. **Indexes and log stay in sync, every run.** Stale indexes silently degrade retrieval — enforced, not advisory.
 7. **File names are `lowercase-with-hyphens`.**
-8. **Single locus of change.** Per-bucket subagents write only inside their assigned subtree. The orchestrator is the sole writer of `index.md`, `log.tsv`, `_unsorted/`, and `_eval/results.tsv`.
+8. **Single locus of change.** Per-bucket workers write only inside their assigned subtree. The orchestrator is the sole writer of `index.md`, `log.tsv`, `_unsorted/`, and `_eval/results.tsv`.
 9. **Schema is frozen.** No verb may modify `schema.md`.
 
 ---
@@ -278,6 +278,6 @@ The `Skills/auto-capture/SKILL.md` skill lets the agent quietly persist conversa
 - **Progressive disclosure.** The agent walks indexes top-down and reads article bodies only when needed, keeping the context window lean regardless of vault size.
 - **Human taxonomy, agent clustering.** Buckets are yours to design. Topics emerge from the material. This split keeps macro structure stable while micro-structure adapts.
 - **Self-contained articles.** Images are copied into topic folders on consolidation so source deletion never breaks article embeds.
-- **Parallel consolidation.** One subagent per bucket means consolidation scales with bucket count, not vault size.
+- **Per-bucket workers.** One worker per bucket — parallel where the runtime supports it, sequential otherwise — means consolidation scales with bucket count, not vault size.
 - **Quarantine over guessing.** An article the agent can't route goes to `_unsorted/` and surfaces in the run report — never silently into a wrong bucket.
 - **Measurable quality.** The `evaluate` verb gives the wiki a fixed benchmark. `files_read` is the primary signal: a well-structured wiki should answer questions in fewer reads as consolidation matures.

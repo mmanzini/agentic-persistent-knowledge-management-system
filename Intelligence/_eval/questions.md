@@ -77,6 +77,58 @@ interview.
 
 **Expected file_read budget:** 1 article body.
 
+### q6 — generative task with mandatory personal-context auto-pull (TEMPLATE)
+
+**Prompt:** *Replace this with your own generative-task question
+that should force the agent to walk a personal-context bucket
+(e.g., a bucket sourced from `Resources/personal/about-me.md` and
+`writing-rules.md`) BEFORE generating.* Example:
+"Draft a short LinkedIn post (≤120 words) introducing this project
+in my voice — what it is, why it exists, what makes it different."
+
+**Target topics:** the personal-context bucket (e.g.,
+`personal/_master-index` and articles inside it). A `good` answer
+reads those articles **before** generating, and the resulting output
+matches the user's stated voice (no marketing fluff, no AI-writing
+tells).
+
+**What this tests:** the personal-context auto-pull behaviour
+described in `query` step "Personal context auto-pull". This is a
+**generative** task — the trigger is the task type, not the user's
+wording. The agent must walk `personal/` proactively. Skipping it
+is a regression even if the output sounds plausible.
+
+**Tracking:** in `_eval/results.tsv` `notes`, record
+`personal_pulled=yes expected=yes`. A `good` quality requires
+`personal_pulled=yes`; `personal_pulled=no` downgrades to `poor`
+regardless of content quality.
+
+**Expected file_read budget:** 2–3 article bodies (all from the
+personal-context bucket).
+
+### q7 — boundary case: pure technical query, no personal walk expected (TEMPLATE)
+
+**Prompt:** *Replace this with your own pure-technical/reference
+question that should NOT trigger a personal-context walk.* Example:
+"Explain how the `consolidate` verb handles a source file that
+matches two buckets at once."
+
+**Target topic:** any technical/reference topic in your wiki — not
+the personal-context bucket.
+
+**What this tests:** the **negative side** of the personal-context
+auto-pull rule. This is a pure technical/reference question. The
+agent must **not** pull `personal/`. Over-pull is a regression
+because it inflates `files_read` and conditions answers on
+irrelevant context.
+
+**Tracking:** in `_eval/results.tsv` `notes`, record
+`personal_pulled=no expected=no`. If `personal_pulled=yes`, downgrade
+to `poor` regardless of content quality.
+
+**Expected file_read budget:** 1–2 article bodies (all from the
+target technical topic).
+
 ## How to add a question
 
 1. Append a new section here with an ID (`q6`, `q7`, …), a prompt,
