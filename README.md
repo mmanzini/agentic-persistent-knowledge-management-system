@@ -1,4 +1,4 @@
-# Agentic Persistent Knowledge Management System
+# Agentic Knowledge Engine
 
 A wiki-backed RAG vault operated by an AI agent (Claude Code). Raw sources go in; structured, cited, interlinked knowledge articles come out. The agent handles routing, clustering, and indexing — you define the top-level taxonomy.
 
