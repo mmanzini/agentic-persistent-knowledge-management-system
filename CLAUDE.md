@@ -27,15 +27,20 @@ improve agent behaviour; never edit `schema.md` mid-run.
 1. Read [schema.md](schema.md) once. Treat it as fixed for the
    session. Do not edit it.
 2. Read this file (the verbs and orchestration rules below).
-3. Read `Intelligence/index.md` when entering the wiki for a
-   `query` or `consolidate`.
+3. Read **both** thin routers when entering the wiki for a `query` or
+   `consolidate`: `Intelligence/index.md` (the bucket router) **and**
+   `Intelligence/_episodes/_index.md` (the episodic-memory router).
+   Both are body-free — load them first, then drill down on demand.
+   Recall (see *Episodic memory*) walks the episode router.
 
 ## Verbs
 
-The vault has four verbs: **`query`** (read), **`consolidate`**
-(write from `Resources/`), **`refine`** (audit, read-only), and
-**`evaluate`** (measure). Schemas, hard rules, log/eval formats, and
-the drift-count definition all live in `schema.md`.
+The vault has five verbs: **`query`** (read), **`consolidate`**
+(write from `Resources/`), **`refine`** (audit, read-only),
+**`evaluate`** (measure), and **`reflect`** (maintain episodic
+memory). Schemas, hard rules, log/eval formats, and the drift-count
+definition all live in `schema.md`. The recall/capture mechanics that
+wrap every verb live in the **Episodic memory** section below.
 
 ---
 
@@ -73,14 +78,22 @@ bodies last.
    than 5 article bodies, surface that to the user before
    continuing — usually the question is too broad or the buckets
    are mis-cut.
+8. **Recall.** Also consult `Intelligence/_episodes/_index.md` and
+   perform **Recall** (the recall step in *Episodic memory* below):
+   match the question's tags against the kind indexes and pull at most
+   `k = 3` exemplar episode bodies + `reflections.md` *only when they
+   match*; skip `distilled` episodes. Pure-technical questions read the
+   router but pull no episode bodies.
 
 **Personal context auto-pull.** `query`-style walks aren't only
 triggered by explicit user questions. When the task at hand is
 **generative and personal-context-relevant** — drafting prose,
 writing a post or an email, designing user-facing copy, deciding
 tone, or making a choice where the user's preferences matter — the
-agent walks `Intelligence/personal/` *before generating*, if that
-bucket exists. The trigger is the task type, not the user's wording.
+agent walks `Intelligence/personal/` **and** the `_episodes/life` +
+`_episodes/signals` kinds *before generating*, if those exist. Signal
+episodes carry stated preferences; life episodes carry past days as
+context. The trigger is the task type, not the user's wording.
 For purely technical or reference work (debugging, code reading,
 "how does library X behave"), skip the personal bucket entirely.
 The bucket's `_master-index.md` Scope paragraph is the routing
@@ -91,6 +104,11 @@ signal — read it first if unsure.
 ### `consolidate`
 
 When the user says "consolidate":
+
+**Recall first.** Consult `Intelligence/_episodes/_index.md` and perform
+**Recall** (see *Episodic memory*): pull relevant `operational`
+exemplars + `reflections.md` so past routing decisions inform this run.
+Then proceed.
 
 0. **Quarantine pre-step.** List the contents of
    `Intelligence/_unsorted/` (excluding `_index.md`). If anything is
@@ -253,6 +271,27 @@ to `_eval/results.tsv`, and produce a summary.
 
 ---
 
+### `reflect`
+
+The episodic-memory maintenance verb. Read-only against `Resources/`;
+writes **only** inside `_episodes/`. Maintains the zone whose
+recall/capture mechanics are described in *Episodic memory* below.
+
+1. Scan `operational/` (and `life`/`signals`) episode `Insights`.
+2. Distill recurring patterns into `reflections.md` — **merge and
+   rewrite**, never append unboundedly; keep each pattern generalized
+   and cite its source episodes.
+3. Stamp folded episodes `distilled: true` so they leave the hot
+   recall surface (kept on disk for audit).
+4. Append a `reflect_summary` row to `log.tsv` with
+   `episodes=<N> reflections=<N>`.
+
+**Auto-chain:** `consolidate` → `refine` → `reflect`. Run `reflect`
+after `refine` so each consolidation's experience is distilled while
+fresh. `reflect` never edits `CLAUDE.md` or `schema.md`.
+
+---
+
 ## Episodic memory
 
 The buckets are **semantic** memory (facts). `Intelligence/_episodes/`
@@ -305,23 +344,6 @@ auto-pull** additionally consults `_episodes/life` and
   `delete_after_consolidation: true`, so capturing post-run would find
   the source already deleted. Reuse the content already loaded; the
   episode cites the origin with `(source: …)`.
-
-### `reflect` (the distillation verb)
-
-Read-only against `Resources/`; writes **only** inside `_episodes/`.
-
-1. Scan `operational/` (and life/signals) episode `Insights`.
-2. Distill recurring patterns into `reflections.md` — **merge and
-   rewrite**, never append unboundedly; keep each pattern generalized
-   and cite its source episodes.
-3. Stamp folded episodes `distilled: true` so they leave the hot
-   recall surface (kept on disk for audit).
-4. Append a `reflect_summary` row to `log.tsv` with
-   `episodes=<N> reflections=<N>`.
-
-**Auto-chain:** `consolidate` → `refine` → `reflect`. Run `reflect`
-after `refine` so each consolidation's experience is distilled while
-fresh.
 
 ### Hard constraint
 

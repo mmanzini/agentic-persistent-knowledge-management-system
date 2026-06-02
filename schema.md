@@ -330,15 +330,20 @@ Intelligence/_episodes/
   _index.md            # thin router: the three kinds + tag vocabulary, no bodies
   operational/         # the agent's own verb runs
     _index.md
-    <verb>-<iso-timestamp>.md
+    operational-<verb>-<iso-timestamp>.md   # filename = episode_id
   life/                # derived from Resources/Daily/ digests
     _index.md
-    <date>.md
+    life-<date>.md                          # filename = episode_id
   signals/             # derived from Resources/context/ auto-capture drops
     _index.md
-    <slug>.md
+    signal-<slug>.md                        # filename = episode_id
   reflections.md       # distilled, MERGED generalized patterns
 ```
+
+**Filename rule (resolvability):** an episode file is named exactly
+`<episode_id>.md` (kind-prefixed), so a kind-index one-liner that lists
+`<episode_id>` resolves directly to `<kind>/<episode_id>.md`. Recall
+depends on this — do not drop the kind prefix from the filename.
 
 ### Episode schema — `_episodes/<kind>/<id>.md`
 
