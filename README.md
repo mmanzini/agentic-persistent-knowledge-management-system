@@ -31,6 +31,12 @@ vault/
     ├── _eval/
     │   ├── questions.md    # fixed evaluation question set
     │   └── results.tsv     # per-question results across evaluate runs
+    ├── _episodes/          # episodic memory — the agent's experiences (see below)
+    │   ├── _index.md       # thin router: the three kinds + tag vocabulary
+    │   ├── operational/    # the agent's own verb runs
+    │   ├── life/           # derived from Resources/Daily/ digests
+    │   ├── signals/        # derived from Resources/context/ auto-capture drops
+    │   └── reflections.md  # distilled, merged generalized patterns
     └── <bucket>/
         ├── _master-index.md   # bucket scope + topic list
         └── <topic>/
@@ -38,6 +44,19 @@ vault/
             ├── article-slug.md
             └── image.png      # images live beside their article
 ```
+
+### Two kinds of memory
+
+`Intelligence/` holds **semantic** memory — the buckets are facts:
+cited, indexed, interlinked articles. `Intelligence/_episodes/` holds
+**episodic** memory — the agent's record of *experiences* (goal →
+actions → outcome → insight): its own verb runs, plus date-keyed life
+episodes and captured signals. Semantic memory answers *"what is
+true?"*; episodic memory answers *"what happened, and what worked last
+time?"* The agent **recalls** relevant episodes into context at the
+start of each run, so curation and retrieval compound instead of
+restarting from scratch every time — the autoresearch loop applied to
+the agent's own behaviour.
 
 ### Two layers inside `Intelligence/`
 
@@ -52,7 +71,12 @@ vault/
 
 ---
 
-## The four verbs
+## The verbs
+
+Four core verbs — `query`, `consolidate`, `refine`, `evaluate` — plus
+`reflect`, which maintains episodic memory. **Every run is recall → act
+→ capture:** the agent recalls relevant past episodes before acting and
+writes a new episode after, so experience accumulates across runs.
 
 ### `query`
 
@@ -104,6 +128,20 @@ Runs the fixed question set in `_eval/questions.md` against the live wiki. For e
 - `answer_quality` — `good` | `partial` | `poor` | `missing`.
 
 Results append to `_eval/results.tsv`. The orchestrator also writes one `eval_summary` row to `log.tsv` with aggregate counts. Running `evaluate` regularly lets you track whether `consolidate` is making the wiki better at answering the questions you actually care about.
+
+Episodic recall has its own cost line: `recall_reads` (episode bodies read during recall) is tracked **separately** from `files_read`, so the wiki-retrieval baseline stays comparable. The `eval_summary` row also trends `quarantine_rate` — together these show whether learning from experience is actually paying off (faster routing, fewer mis-routes) over time.
+
+### `reflect`
+
+Maintains episodic memory — reads only `_episodes/`, writes only inside it:
+
+1. Distills recurring `Insights` across episodes into `reflections.md` — **merging and rewriting**, never appending unboundedly, so the file stays small as the store grows.
+2. Stamps folded episodes `distilled: true` so they leave the hot recall surface (kept on disk for audit).
+3. Appends a `reflect_summary` row to `log.tsv`.
+
+`reflect` **auto-chains** after `consolidate` (→ `refine` → `reflect`). It never edits `CLAUDE.md` or `schema.md` — reflections feed run *context* only, never the program.
+
+**Why recall stays cheap as episodes pile up:** a recall walk reads the `_episodes/` router, one kind-index of one-liners, then at most **3 episode bodies** plus the small merged `reflections.md`. `distilled` episodes are skipped. So recall cost is bounded — it does not grow with the store.
 
 ---
 
@@ -236,6 +274,7 @@ timestamp  question_id  files_read  answer_quality  notes
 | Broken embeds | `![[image.ext]]` references missing from the topic folder |
 | Cross-bucket links | Any `[[link]]` that crosses bucket boundaries |
 | Schema violations | Articles missing required sections or factual claims without citations |
+| Episode integrity | Episodes missing required frontmatter/sections, or any `[[ ]]` link inside an episode that points outside `_episodes/` (episodes reference articles by `(source: …)` citation only) |
 
 The orchestrator compares the current drift count to the previous `refine_summary` row and reports **advance** (drift down, or flat with `articles_changed > 0`), **hold** (flat, no changes), or **regress** (drift up). Regressions are surfaced — never silently undone.
 
@@ -250,7 +289,7 @@ The orchestrator compares the current drift count to the previous `refine_summar
 5. **Images live beside their article.** No cross-folder image references.
 6. **Indexes and log stay in sync, every run.** Stale indexes silently degrade retrieval — enforced, not advisory.
 7. **File names are `lowercase-with-hyphens`.**
-8. **Single locus of change.** Per-bucket workers write only inside their assigned subtree. The orchestrator is the sole writer of `index.md`, `log.tsv`, `_unsorted/`, and `_eval/results.tsv`.
+8. **Single locus of change.** Per-bucket workers write only inside their assigned subtree. The orchestrator is the sole writer of `index.md`, `log.tsv`, `_unsorted/`, `_eval/results.tsv`, and `_episodes/`.
 9. **Schema is frozen.** No verb may modify `schema.md`.
 
 ---
@@ -275,7 +314,8 @@ The `Skills/auto-capture/SKILL.md` skill lets the agent quietly persist conversa
 
 ## Design notes
 
-- **Progressive disclosure.** The agent walks indexes top-down and reads article bodies only when needed, keeping the context window lean regardless of vault size.
+- **Progressive disclosure.** The agent walks indexes top-down and reads article bodies only when needed, keeping the context window lean regardless of vault size. **Episodic recall obeys the same discipline:** a bounded tag-matched walk (≤3 episode bodies) plus a `reflections.md` that *compresses* many episodes into a few generalized lines, so recall cost stays roughly constant even as the episode store grows.
+- **Two kinds of memory.** Semantic memory (buckets = facts) answers "what is true?"; episodic memory (`_episodes/` = experiences) answers "what happened, and what worked last time?" Recalling episodes at run-start lets curation and retrieval compound across runs instead of restarting cold — and `reflect` distils experience into reusable heuristics without ever touching the frozen `CLAUDE.md` / `schema.md` bedrock.
 - **Human taxonomy, agent clustering.** Buckets are yours to design. Topics emerge from the material. This split keeps macro structure stable while micro-structure adapts.
 - **Self-contained articles.** Images are copied into topic folders on consolidation so source deletion never breaks article embeds.
 - **Per-bucket workers.** One worker per bucket — parallel where the runtime supports it, sequential otherwise — means consolidation scales with bucket count, not vault size.

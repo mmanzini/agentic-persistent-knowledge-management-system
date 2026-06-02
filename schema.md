@@ -49,8 +49,9 @@ These are non-negotiable. A run that violates any of them is a bug.
    `refine`, each per-bucket subagent writes **only** inside its
    assigned `Intelligence/<bucket>/` subtree. The **orchestrator** is
    the sole writer of `Intelligence/index.md`,
-   `Intelligence/log.tsv`, `Intelligence/_unsorted/`, and
-   `Intelligence/_eval/results.tsv`. This eliminates write races and
+   `Intelligence/log.tsv`, `Intelligence/_unsorted/`,
+   `Intelligence/_eval/results.tsv`, and `Intelligence/_episodes/`.
+   This eliminates write races and
    matches autoresearch's "one file is the locus of change" principle
    — adapted to a per-bucket fan-out.
 9. **Schema is frozen.** This file (`Vault/schema.md`) is read-only
@@ -225,13 +226,20 @@ timestamp	verb	source	bucket	topic	articles_changed	images_copied	status	notes
 - `articles_changed` — integer count (written + updated).
 - `images_copied` — integer count.
 - `status` — `kept` | `quarantined` | `crashed` | `refine_summary`
-  | `eval_summary`.
+  | `eval_summary` | `episode_captured` | `reflect_summary`.
 - `notes` — short freeform. For `refine_summary` rows, **must
   include** `drift=<N>` where N is the total drift count
   (orphans + index-mismatches + broken-embeds + cross-bucket-links
-  + schema-violations). For `eval_summary` rows, **must include**
-  `total_files_read=<N>` and `quality=<good>/<partial>/<poor>/<missing>`
-  counts (e.g. `quality=3g/1p/1m`).
+  + schema-violations + episode-integrity). For `eval_summary` rows,
+  **must include** `total_files_read=<N>` and
+  `quality=<good>/<partial>/<poor>/<missing>` counts
+  (e.g. `quality=3g/1p/1m`), and **should include**
+  `recall_reads=<N>` and `quarantine_rate=<k>/<n>` so the
+  self-improvement trend is visible. For `reflect_summary` rows,
+  **must include** `episodes=<N>` (episodes scanned) and
+  `reflections=<N>` (reflection lines after the merge). For
+  `episode_captured` rows, the `source` column carries the episode
+  path and `notes` is a one-line situation.
 
 **Never use commas as separators.** Tabs only — commas appear in
 freeform `notes`.
@@ -260,7 +268,13 @@ timestamp	question_id	files_read	answer_quality	notes
 - `answer_quality` — `good` | `partial` | `poor` | `missing`.
   Self-judged by the agent against the question's intent.
 - `notes` — short freeform. Note any cross-topic walks, any reliance
-  on `(source: needs-verification)` claims, any quarantine hits.
+  on `(source: needs-verification)` claims, any quarantine hits. When
+  episodic recall contributed to the answer, **include
+  `recall_reads=<N>`** — the count of episode *bodies* read during
+  recall. This is tracked **separately from `files_read`** (which
+  stays the pure wiki-retrieval metric, so its historical baseline
+  remains comparable). `recall_reads` is bounded by the recall budget
+  `k` (see *Episodic memory contracts*).
 
 ---
 
@@ -282,6 +296,13 @@ A single integer. Sum of:
 - **Schema violations** — articles missing required sections
   (`Source:`, `Summary`, etc.), or factual claims without
   `(source: ...)` citations.
+- **Episode integrity** — episodes in `Intelligence/_episodes/`
+  missing required frontmatter or sections (see *Episodic memory
+  contracts*), or any `[[wiki link]]` inside an episode that points
+  **outside** `_episodes/` (episodes reference bucket articles by
+  `(source: ...)` citation only — a `[[ ]]` edge leaving the zone is
+  a violation, counted once per occurrence). Episode→article
+  citations are **not** counted (they are not link-graph edges).
 
 **Advance-on-improvement rule:** the orchestrator compares the
 current `refine_summary` row's drift count to the previous one (last
@@ -290,3 +311,126 @@ current `refine_summary` row's drift count to the previous one (last
 **hold** (drift flat with `articles_changed == 0`), or **regress**
 (drift up). The orchestrator never silently undoes work — humans
 decide what to do with a regression report.
+
+---
+
+## Episodic memory contracts
+
+`Intelligence/_episodes/` is the **episodic** memory zone — the
+agent's record of *experiences* (goal → actions → outcome → insight),
+distinct from the semantic facts held in the buckets. It is a
+governance zone like `_eval/` and `_unsorted/`: **not** a bucket, so
+the `query` bucket-walk ignores it, and the orchestrator is its sole
+writer (hard rule 8). These schemas are frozen — copy them verbatim.
+
+### Zone layout
+
+```
+Intelligence/_episodes/
+  _index.md            # thin router: the three kinds + tag vocabulary, no bodies
+  operational/         # the agent's own verb runs
+    _index.md
+    <verb>-<iso-timestamp>.md
+  life/                # derived from Resources/Daily/ digests
+    _index.md
+    <date>.md
+  signals/             # derived from Resources/context/ auto-capture drops
+    _index.md
+    <slug>.md
+  reflections.md       # distilled, MERGED generalized patterns
+```
+
+### Episode schema — `_episodes/<kind>/<id>.md`
+
+```markdown
+---
+episode_id: <kind>-<iso-timestamp-or-slug>
+kind: operational | life | signal
+verb: consolidate | query | refine | evaluate    # operational only; omit otherwise
+timestamp: 2026-06-02T10:05:00Z
+situation: <one line — the context/inputs>
+intent: <one line — the goal of this episode>
+outcome: success | partial | failure
+tags: [bucket-or-topic, source-type, …]          # the recall index
+distilled: false                                  # reflect sets true once folded into reflections.md
+---
+
+## Situation
+Context and inputs. operational: which sources / which question.
+life: the day in one paragraph. signal: what was captured and why.
+
+## Actions
+What was done, in order. operational: per-source routing decisions
+(bucket→topic, why), articles read/written, quarantine calls.
+life/signal: the decision/preference recorded (often N/A).
+
+## Outcome
+Result + concrete evidence. operational: kept/quarantined counts,
+eval quality, drift delta. life: decisions, open loops. signal: the
+stated preference/decision.
+
+## Insights
+The generalizable nugget — effective approaches and pitfalls. This is
+what `reflect` later distills.
+
+## Links
+`[[related-episode]]` **within `_episodes/` only**, and
+`(source: <path>)` citations to origin sources and related bucket
+articles.
+```
+
+Required frontmatter keys: `episode_id`, `kind`, `timestamp`,
+`situation`, `intent`, `outcome`, `tags`, `distilled`. Required
+sections: `Situation`, `Actions`, `Outcome`, `Insights`. Missing
+keys/sections count toward **episode integrity** drift.
+
+### Kind-index schema — `_episodes/<kind>/_index.md`
+
+```markdown
+# <Kind> episodes
+
+One line describing what this kind captures.
+
+## Episodes
+
+- `<episode_id>` | tags: a, b | <one-line situation> | <outcome> | distilled: <bool>
+- ...
+```
+
+One line per episode — `id | tags | situation | outcome | distilled`.
+Bodies are never inlined here; this is the routing surface recall
+scans before pulling ≤`k` bodies.
+
+### Reflection schema — `_episodes/reflections.md`
+
+A flat list of distilled, generalized heuristics, each citing the
+episodes it was drawn from. `reflect` **rewrites** this file (merge,
+not append) so it stays small as the episode store grows.
+
+```markdown
+# Reflections
+
+Distilled patterns across episodes. Generalized guidance, not
+step-by-step. `reflect` merges and rewrites this list; it never
+appends unboundedly.
+
+- **<category>:** <generalized heuristic>. (episodes: <id>, <id>)
+- ...
+```
+
+### Recall budget and the linking rule
+
+- **Recall budget `k = 3`.** A recall walk reads at most **3 episode
+  bodies** (exemplars), plus the whole `reflections.md` (kept small
+  by merging). Cost ≈ 1 router + 1 kind-index + ≤3 bodies +
+  `reflections.md` — bounded, not growing with the store. Same spirit
+  as the `query` budget ceiling.
+- **`distilled: true` episodes are excluded from the default exemplar
+  walk** — their insight already lives in `reflections.md`. They stay
+  on disk for audit but leave the hot recall surface.
+- **Linking rule (preserves hard rule 2).** Episodes reference bucket
+  articles by `(source: <bucket>/<topic>/<article>.md)` **citation
+  only** — never `[[wiki links]]`. `[[ ]]` links inside episodes are
+  **within `_episodes/` only** (episode↔episode). Episodes emit no
+  `[[ ]]` edge into a bucket, so the same-bucket-only link firewall is
+  untouched. Bucket articles never link back to episodes (one-way).

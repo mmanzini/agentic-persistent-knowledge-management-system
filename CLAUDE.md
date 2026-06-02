@@ -253,6 +253,85 @@ to `_eval/results.tsv`, and produce a summary.
 
 ---
 
+## Episodic memory
+
+The buckets are **semantic** memory (facts). `Intelligence/_episodes/`
+is **episodic** memory — the agent's record of *experiences*
+(goal → actions → outcome → insight). It exists so the agent stops
+re-deriving the same decisions every run and instead **recalls** what
+happened last time. The frozen schemas (episode, kind-index,
+reflections), the recall budget, and the linking rule live in
+*Episodic memory contracts* in [schema.md](schema.md); this section is
+the behaviour.
+
+**Every verb run is recall → act → capture.** Recall before acting,
+capture after. This wraps `query`, `consolidate`, `refine`, and
+`evaluate` — it does not rewrite their steps above.
+
+### Recall (run-start, bounded)
+
+Before acting, walk `_episodes/` the same top-down way `query` walks
+buckets — **bodies last, hard budget**:
+
+1. Read `_episodes/_index.md` (router) → pick the relevant kind(s):
+   `operational` for routing/retrieval decisions, `life`+`signals` for
+   personal context.
+2. Scan the kind `_index.md` one-liners and match the current task's
+   tags/situation. **Do not load bodies yet.**
+3. Pull at most **`k = 3` episode bodies** (exemplars) — the closest
+   matches. **Skip `distilled: true` episodes** (their insight is
+   already in reflections).
+4. Read `reflections.md` (kept small by merging) for generalized
+   guidance.
+
+Inject both into the run as guidance — "last time I saw input like
+this, here's what I did and what happened." Recall cost is bounded
+(≈ router + kind-index + ≤3 bodies + reflections), not growing with
+the store. For generative/personal tasks, the **Personal context
+auto-pull** additionally consults `_episodes/life` and
+`_episodes/signals` alongside the `personal/` bucket.
+
+### Capture (run-end + inline)
+
+- **Operational episode** — at the end of every verb run, the
+  orchestrator appends one `operational/<verb>-<iso-timestamp>.md`
+  episode (per the schema) and an `episode_captured` row to `log.tsv`,
+  then updates `operational/_index.md`.
+- **Life/signal episodes — inline in `consolidate`.** When
+  `consolidate` processes a `Resources/Daily/` or `Resources/context/`
+  source, write its `life/` or `signals/` episode **after the article
+  and indexes are written and logged (steps 4–8) and before the source
+  is deleted (step 9)** — `Resources/context/` is
+  `delete_after_consolidation: true`, so capturing post-run would find
+  the source already deleted. Reuse the content already loaded; the
+  episode cites the origin with `(source: …)`.
+
+### `reflect` (the distillation verb)
+
+Read-only against `Resources/`; writes **only** inside `_episodes/`.
+
+1. Scan `operational/` (and life/signals) episode `Insights`.
+2. Distill recurring patterns into `reflections.md` — **merge and
+   rewrite**, never append unboundedly; keep each pattern generalized
+   and cite its source episodes.
+3. Stamp folded episodes `distilled: true` so they leave the hot
+   recall surface (kept on disk for audit).
+4. Append a `reflect_summary` row to `log.tsv` with
+   `episodes=<N> reflections=<N>`.
+
+**Auto-chain:** `consolidate` → `refine` → `reflect`. Run `reflect`
+after `refine` so each consolidation's experience is distilled while
+fresh.
+
+### Hard constraint
+
+Episodes and reflections **feed run context only**. The loop **never**
+edits `CLAUDE.md` or `schema.md` — those stay bedrock. The only place
+the agent "writes its learning" is `_episodes/` (and `reflections.md`
+within it). The orchestrator is the **sole writer** of `_episodes/`
+(hard rule 8); per-bucket workers may emit episode row data, the
+orchestrator appends.
+
 ## Orchestration rules
 
 - **One orchestrator per run.** Runs the per-bucket workers (in

@@ -129,6 +129,27 @@ to `poor` regardless of content quality.
 **Expected file_read budget:** 1–2 article bodies (all from the
 target technical topic).
 
+### q8 — episodic recall (life / signal) (TEMPLATE)
+
+**Prompt:** *Replace this with a question only answerable from episodic
+memory — a past decision or a stated preference, not a semantic fact.*
+Example: "What tone preference did I state for drafting, and when?"
+
+**Target:** `Intelligence/_episodes/signals/` (and/or `life/`). Tests
+the **recall** path (not the bucket walk): the agent reads
+`_episodes/_index.md` → the kind `_index.md` one-liners → pulls ≤`k`
+(=3) episode bodies, skipping `distilled: true` ones.
+
+**What this tests:** that experiences are recallable and that recall
+stays bounded. A `good` answer cites the episode(s) with
+`(source: _episodes/…)` and does not exceed the recall budget.
+
+**Tracking:** in `_eval/results.tsv` `notes`, record `recall_reads=<N>`
+**separately** from `files_read` (recall cost is not wiki-retrieval
+cost). `recall_reads > 3` is a budget regression.
+
+**Expected file_read budget:** 0 article bodies; `recall_reads` ≤ 2.
+
 ## How to add a question
 
 1. Append a new section here with an ID (`q6`, `q7`, …), a prompt,
